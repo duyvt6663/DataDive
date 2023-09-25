@@ -887,6 +887,7 @@ Simply ANSWER A, B, or SAME
         claim_map.mapping.update({country_to_infer[idx]: country_list for idx, country_list in enumerate(inferred_countries)})
 
         for suggest in claim_map.suggestion: 
+            print("suggest:", suggest)
             for idx in reversed(range(len(suggest.values))):
                 val = suggest.values[idx]
                 if (val.startswith('@(') or suggest.field == "value"):

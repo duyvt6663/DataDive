@@ -526,7 +526,7 @@ async def main():
 	# p = Profiler()
 	# p.start()
 	paragraph = "."
-	userClaim = "The main source of power generation in China is still coal."
+	userClaim = "Of course, even if 21 countries have achieved decoupling, more than 170 countries have not."
 	# userClaim = "New Zealand's GDP is 10% from tourism."
 	# A significant amount of New Zealand's GDP comes from tourism
 	claim = UserClaimBody(userClaim=userClaim, paragraph=paragraph)
@@ -539,11 +539,11 @@ async def main():
 			claim_map.date.append(suggest.values[0])
 
 	import copy
-	dtps = await potential_data_point_sets_2(claim_map, copy.deepcopy(top_k_datasets))
-	print(dtps)
+	# dtps = await potential_data_point_sets_2(claim_map, copy.deepcopy(top_k_datasets))
+	# print(dtps)
 	# p = Profiler()
 	# with p:
-	reason = await get_reason(claim_map, top_k_datasets, verbose=True)
+	# reason = await get_reason(claim_map, top_k_datasets, verbose=True)
 	# openai.aiosession.
 
 if __name__ == "__main__":

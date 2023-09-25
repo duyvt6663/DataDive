@@ -1,4 +1,3 @@
-from functools import reduce
 import sys
 sys.path.append("../Gloc")
 sys.path.append("..")
@@ -12,6 +11,8 @@ import numpy as np
 import pandas as pd
 import json
 from pathlib import Path
+from functools import reduce
+from fastapi import HTTPException
 import os
 
 class DataMatcher(object):
@@ -298,7 +299,10 @@ class DataMatcher(object):
 
         attributes = list(attributes)
         embeds = [embed_dict[attr] for attr in attributes]  if self.load_desc else self.encode(attributes)
-        info_table = reduce(lambda left, right: pd.merge(left, right, on=["value", "unit", "source"], how= 'outer'), info_tables)
+        if info_tables:
+            info_table = reduce(lambda left, right: pd.merge(left, right, on=["value", "unit", "source"], how= 'outer'), info_tables)
+        else:
+            raise HTTPException(status_code=404, detail="No info table found.")
 
         df = reduce(lambda left, right: pd.merge(left, right, how='outer'), tables)
         df.name = name
