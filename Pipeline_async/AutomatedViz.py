@@ -309,8 +309,11 @@ class AutomatedViz(object):
 		):
 		categories = [p for p in categories if p not in ['year', 'date', 'time', 'country', 'country_name']] # remove temporal/nominal attributes
 		if info_table.empty:
-			info_table = pd.read_csv(f'../Datasets/info/{self.table_name}')
-			info_table.columns = info_table.columns.str.lower()
+			try:
+				info_table = pd.read_csv(f'../Datasets/info/{self.table_name}')
+				info_table.columns = info_table.columns.str.lower()
+			except Exception as e:
+				info_table = None
 		
 		def get_provenance(attr: str):
 			try:
@@ -388,20 +391,24 @@ class AutomatedViz(object):
 				filtered_table = filtered_table[filtered_table[field.name].isin(dates)]
 
 		for category in value_attrs:
-			for _, row in filtered_table[field_names + [category['value']]].iterrows():
-				val = row[category['value']]
-				dataPoint = DataPointValue(
-                    tableName=self.table_name,
-                    valueName=category['value'],
-                    fields={
-						country_attr: row[country_attr],
-						date_attr: int(row[date_attr])
-					},
-                    unit=category['unit'],
-                    value=round(val, 3) if isinstance(val, float) else val
-                )
+			try:
+				for _, row in filtered_table[field_names + [category['value']]].iterrows():
+					val = row[category['value']]
+					dataPoint = DataPointValue(
+						tableName=self.table_name,
+						valueName=category['value'],
+						fields={
+							country_attr: row[country_attr],
+							date_attr: int(row[date_attr])
+						},
+						unit=category['unit'],
+						value=round(val, 3) if isinstance(val, float) else val
+					)
+					
+					dataPoints.append(dataPoint)
+			except Exception as e:
+				print(f"Error in retrieving data points: {e}")
 				
-				dataPoints.append(dataPoint)
 		# update categories with more potential attributes
 		for attr in set(self.attributes) - set(categories) - set(field_names):
 			value_attrs.append({

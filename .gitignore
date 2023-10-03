@@ -14,5 +14,6 @@ Other/*
 Classifiers/*
 **/__init__.py
 Pipeline_async/processed_files/*
+Pipeline_async/fresh files/*
 ```
 Gloc/log.txt

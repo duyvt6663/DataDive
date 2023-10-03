@@ -18,6 +18,15 @@ class OptionProps(BaseModel):
     unit: Optional[str] = None
     provenance: Optional[str] = None
 
+    def to_json(self):
+        result = {
+            "label": self.label,
+            "value": self.value,
+            "unit": self.unit,
+            "provenance": self.provenance
+        }
+        return result
+
 class Field(BaseModel):
     name: str
     type: str
@@ -31,30 +40,81 @@ class Field(BaseModel):
             return self.name == other.name
         return False
 
+    def to_json(self):
+        result = {
+            "name": self.name,
+            "type": self.type,
+            "timeUnit": self.timeUnit
+        }
+        return result
+
 class DateRange(BaseModel):
     date_start: OptionProps
     date_end: OptionProps
 
+    def to_json(self):
+        result = {
+            "date_start": self.date_start.to_json(),
+            "date_end": self.date_end.to_json()
+        }
+        return result
+
 class Ranges(BaseModel):
     values: list[OptionProps]
     fields: Dict[str, Union[list, DateRange]] ## Now date moved into the fields
+
+    def to_json(self):
+        result = {
+            "values": [value.to_json() for value in self.values],
+            "fields": {key: value.to_json() if isinstance(value, DateRange) else value for key, value in self.fields.items()}
+        }
+        return result
 
 class DataPoint(BaseModel):
     tableName: str
     valueName: str ## Now valueName is the name of the field
     fields: Dict[str, Any] # Date is now moved to here
 
+    def to_json(self):
+        result = {
+            "tableName": self.tableName,
+            "valueName": self.valueName,
+            "fields": self.fields
+        }
+        return result
+
 class DataPointValue(DataPoint):
     value: float
     unit: Optional[str] = None
+    
+    def to_json(self):
+        result = {
+            "tableName": self.tableName,
+            "valueName": self.valueName,
+            "fields": self.fields,
+            "value": self.value,
+            "unit": self.unit
+        }
+        return result
 
 class DataPointSet(BaseModel):
     statement: str
     tableName: str
-    dataPoints: list[DataPoint]
+    dataPoints: list[DataPointValue]
     fields: list[Field]
     ranges: Ranges
     reasoning: Optional[str] = None
+
+    def to_json(self):
+        result = {
+            "statement": self.statement,
+            "tableName": self.tableName,
+            "dataPoints": [dp.to_json() for dp in self.dataPoints],
+            "fields": [field.to_json() for field in self.fields],
+            "ranges": self.ranges.to_json(),
+            "reasoning": self.reasoning
+        }
+        return result
 
 class ClaimMap(BaseModel):        
     class SuggestValue(BaseModel):

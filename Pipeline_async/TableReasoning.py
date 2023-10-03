@@ -775,7 +775,7 @@ Simply ANSWER A, B, or SAME
         for idx, tagged_country in enumerate(claim_tag["country"]):
             claim_tag["cloze_vis"] = claim_tag["cloze_vis"].replace(f"{{{tagged_country}}}", "{country}")
             if tagged_country.startswith("@("):
-                if all(p not in tagged_country.lower() for p in ["countries", "country"]):
+                if all(p not in tagged_country.lower() for p in ["countries", "country", "asia", "africa", "europe", "north america", "south america", "oceania", "antarctica"]):
                     new_tagged_country = f"@(Countries of {tagged_country[2:]}"
                     claim_tag["vis"] = claim_tag["vis"].replace(f"{{{tagged_country}}}", f"{{{new_tagged_country}}}")
                     claim_tag["country"][idx] = new_tagged_country
@@ -846,24 +846,43 @@ Simply ANSWER A, B, or SAME
         infer_country_tasks, country_to_infer = [], []
         for idx, country in enumerate(claim_map.country):
             if country.startswith('@('):
-                if any(p in country for p in ["Bottom", "Top", "with", "Countries of"]):
-                    infer_country_tasks.append(
+                print("country:", country)
+                if any(p in country for p in ["Bottom", "Top", "with"]):
+                    task = asyncio.create_task(
                         self._infer_country(
                             country[2:-2], 
                             claim_map.date, 
                             new_attributes, table
                         )
-                    )	
+                    )
+                    infer_country_tasks.append(task)	
+                    country_to_infer.append(country)
+                elif True:
+                    async def get_country_info(country):
+                        prompt = [
+                            {"role": "user", "content": """Return top 5 countries that are: <{}>\nReturn answer in Python list format""".format(country[2:-2])},
+                        ]                
+                        response = await self._call_api_2(prompt, model=Model.GPT3)
+                        answer = eval(response[0])
+                        return answer
+
+                    task = asyncio.create_task(get_country_info(country))
+                    infer_country_tasks.append(task)
                     country_to_infer.append(country)
                 else: # query like @(Asian countries?) have been handled by the _suggest_variable module
                     cntry_sets = [cntry_set for cntry_set in claim_map.suggestion if cntry_set.field == self.INDICATOR["countries"]]
                     suggest_countries = set(cntry for sublist in cntry_sets for cntry in sublist.values)
+                    print("suggest_countries:", suggest_countries)
                     actual_suggest_countries = []
                     for cntry in suggest_countries:
                         matched_cells = _get_matched_cells(cntry, self.dm, table, attr=country_attr)
                         if matched_cells:
                             actual_suggest_countries.append(matched_cells[0][0])
                     # suggest_countries = random.sample(suggest_countries, 5)
+                    print("actual_suggest_countries:", actual_suggest_countries)
+                    sem_scores = self.dm.similarity_batch(country, actual_suggest_countries)
+                    # sort actual_suggest_countries using sem_scores
+                    actual_suggest_countries = [x for _, x in sorted(zip(sem_scores, actual_suggest_countries), reverse=True)]
                     claim_map.mapping[country] = actual_suggest_countries[:5] # take the top 5 suggested
             else:
                 matched_cells = _get_matched_cells(country, self.dm, table, attr=country_attr)
@@ -875,19 +894,19 @@ Simply ANSWER A, B, or SAME
         for suggest in claim_map.suggestion: 
             for val in suggest.values:
                 if val.startswith('@('):
-                    infer_country_tasks.append(
+                    task = asyncio.create_task(
                         self._infer_country(
                             val[2:-2 if val[-2]=="?" else -1], claim_map.date, 
                             new_attributes, table
                         )
                     )
+                    infer_country_tasks.append(task)
                     country_to_infer.append(val)
 
         inferred_countries = await asyncio.gather(*infer_country_tasks)
         claim_map.mapping.update({country_to_infer[idx]: country_list for idx, country_list in enumerate(inferred_countries)})
 
         for suggest in claim_map.suggestion: 
-            print("suggest:", suggest)
             for idx in reversed(range(len(suggest.values))):
                 val = suggest.values[idx]
                 if (val.startswith('@(') or suggest.field == "value"):

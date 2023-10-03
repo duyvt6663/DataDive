@@ -1,6 +1,8 @@
 import asyncio
 import json
 import sys
+
+from matplotlib import pyplot as plt
 sys.path.append("../Gloc")
 sys.path.append("..")
 
@@ -22,6 +24,7 @@ from api import *
 class Tester():
     def __init__(self, datasrc: str = None):
         self.datasrc = datasrc
+        self.dm = DataMatcher(datasrc=datasrc)
 
     def test_post_process_sql(self):
         sql = """No, we cannot determine if the share of children in work dropped by one percentage point between 2012 and 2016 as the 
@@ -251,13 +254,15 @@ data provided does not include the necessary information """
                 else:
                     print(f"Already processed {ind}")
 
-    async def test_recommend(self, n=1):
+    async def test_recommend(self, n=1, rset=None):
         filename = "./processed_files/Pipeline Evaluation - Ground Truth - Datasets.csv"
         df = pd.read_csv(filename)
         lock = asyncio.Lock()
         sem = asyncio.Semaphore(n)  # Limit to n concurrent tasks
         tasks = []
         for ind, row in df.iterrows():
+            if rset and ind not in rset:
+                continue
             if pd.notna(row["Sentence"]):
                 sentence = row["Sentence"]
             else: continue
@@ -273,9 +278,131 @@ data provided does not include the necessary information """
         async with sem:  # This will block if there are already n running tasks
             await self.get_suggested_queries_and_write(claim, model, ind, lock)
 
+
+
+    async def test_potential_datapoints(self, n=2, rset=None):
+        recfilename = "./processed_files/Recommendations.json"
+        recdf = json.load(open(recfilename, 'r'))
+        lock = asyncio.Lock()
+        tasks = []
+        for ind, claim_map in recdf.items():
+            if rset and int(ind) not in rset:
+                continue
+            claim_map = ClaimMap(**claim_map)
+            task = asyncio.create_task(self.get_potential_datapoints_and_write(claim_map, ind, lock))
+            tasks.append(task)
+        await asyncio.gather(*tasks)
+    
+    async def find_top_k_datasets(self, claim_map: ClaimMap, verbose=True):
+        value_keywords = [keyword for sublist in claim_map.suggestion for keyword in sublist.values if sublist.field == "value" or keyword.startswith("@(")]
+        country_keywords = [keyword[2:-2].replace("Country", "").replace("Countries", "").strip() for keyword in claim_map.country if keyword.startswith("@(")]
+        keywords = country_keywords + claim_map.value + value_keywords
+        print("keywords:", keywords)
+        top_k_datasets = await self.dm.find_top_k_datasets("", k=8, method="gpt", verbose=verbose, keywords=keywords)
+        datasets = [Dataset(name=name, description=description, score=score, fields=fields) 
+            for name, description, score, fields in top_k_datasets]
+        return datasets
+    
+    async def get_potential_datapoints_and_write(self, claim_map: ClaimMap, ind, lock):
+        async with lock:
+            try:
+                with open('./processed_files/DatapointSets.json', 'r+') as f:
+                    data = json.load(f)
+                    if str(ind) not in data:
+                        datasets = await self.find_top_k_datasets(claim_map, verbose=True)
+                        result = await potential_data_point_sets_2(claim_map, datasets, True)
+                        data[str(ind)] = [result[0].to_json()]
+                        f.seek(0)
+                        json.dump(data, f)
+                        f.truncate()
+                    else:
+                        print(f"Already processed {ind}")
+            except Exception as e:
+                print("Super error: ", e)
+        
+    async def merge_datapoints_recommend(self, rset=None):
+        df = pd.read_csv("./processed_files/Pipeline Evaluation - Ground Truth - Datasets.csv")
+        datapoint_df = json.load(open("./processed_files/DatapointSets.json", 'r'))
+        rec_df = json.load(open("./processed_files/Recommendations.json", 'r'))
+        merged_df = []
+        for ind, row in df.iterrows():
+            if not pd.notna(row["Sentence"]) or not pd.notna(row["Comment"]):
+                continue
+            if rset and ind not in rset:
+                continue
+            idx = str(ind)
+            merged_df.append({
+                "snippet": {
+                    "sentences": [row["Sentence"]],
+                    "text": [row["Comment"]],
+                    "url": row["Link"],
+                    "title": None,
+                    "type": row["Type"],
+                    "header": None,
+                },
+                "claimMap": rec_df[idx] if idx in rec_df else {},
+                "dataPointSet": datapoint_df[idx] if idx in datapoint_df else {}
+            })
+        
+        with open("./processed_files/Merged.json", "w") as f:
+            json.dump(merged_df, f, indent=4)
+            
+    async def play_around(self, write=False):
+        df = pd.read_csv("./processed_files/Pipeline Evaluation - Ground Truth - Datasets.csv")
+        # Exploratory analysis on the topic
+        topics = df['Topic'].value_counts()
+        print("Topics distribution:\n", topics)
+        
+        # Task: Visualize the distribution of topics
+        async def visualize_topic_distribution(self, topics):
+            topics.plot(kind='bar')
+            plt.title('Distribution of Topics')
+            plt.xlabel('Topics')
+            plt.ylabel('Count')
+            plt.show()
+        vis_task = asyncio.create_task(visualize_topic_distribution(self, topics))
+
+        # check if merged files include or exclude correctly
+        with open("./fresh files/Merged.json", 'r') as f:
+            mf = json.load(f)
+            sents = set(df['Sentence'].tolist())
+            # count how many snippets are included\
+            count, removed = 0, []
+            for idx, item in reversed(list(enumerate(mf))):
+                sent = item['snippet']['sentences'][0]
+                if sent in sents:
+                    count += 1
+                    # add title
+                    item['snippet']['title'] = df[df['Sentence'] == sent]['Title'].tolist()[0]
+                else:
+                    removed.append(sent)
+                    mf.pop(idx)
+                    
+            print("Count of snippets included:", count)
+            print("Count of total snippets:", len(df['Sentence'].tolist()))
+            print("Removed snippets:", removed)
+
+            # write to file
+            if write:
+                with open("./fresh files/Merged.json", 'w') as f:
+                    json.dump(mf, f, indent=4)
+            
+    async def add_index(self, write=False):
+        with open("./fresh files/Merged.json", 'r') as f:
+            mf = json.load(f)
+            for idx, item in enumerate(mf):
+                item['id'] = idx
+            
+            if write:
+                with open("./fresh files/Merged.json", 'w') as f:
+                    json.dump(mf, f, indent=4)
+
 async def main():
     tester = Tester(datasrc="../Datasets")
-    await tester.test_recommend()
+    rset = [57, 14, 72]
+    # await tester.test_recommend(rset=rset, n=2)
+    # await tester.test_potential_datapoints(rset=rset, n=2)
+    await tester.add_index(write=True)
 
 if __name__ == "__main__":
     asyncio.run(main())

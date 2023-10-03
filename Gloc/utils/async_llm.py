@@ -94,9 +94,13 @@ async def _call_openai(
         await asyncio.sleep(10)
         raise KeyError('ServiceUnavailableError') from e
     except openai.error.APIConnectionError as e:
-        print('Sleeping 10 secs.')
+        print('Sleeping 15 secs.')
         await asyncio.sleep(15)
         raise ValueError('APIConnectionError') from e
+    except openai.error.APIError as e:
+        print('Sleeping 15 secs.')
+        await asyncio.sleep(15)
+        raise ValueError('APIError') from e
 
 async def call_model(
     model,

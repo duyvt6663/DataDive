@@ -155,9 +155,9 @@ class DataMatcher(object):
                 attr_scores = np.max(score_batches[ind], axis=0)
                 max_score = max(attr_scores)
                 # take the top 10 attributes with highest scores
-                attr_score_pairs = [(attr, score) for attr, score in zip(self.description[name]['columns'], attr_scores) if score > max_score * .9 and score > .5]
+                attr_score_pairs = [(attr, score) for attr, score in zip(self.description[name]['columns'], attr_scores) if score > max_score * .8 and score > .45]
                 attr_score_pairs.sort(key=lambda x: x[1], reverse=True)
-                dataset_map[3] = [attr for attr, score in attr_score_pairs[:10]]
+                dataset_map[3] = [attr for attr, score in attr_score_pairs[:15]]
         else:
             # reset dataset_map[3] to empty list
             for dataset_map in top_k_datasets:
@@ -241,14 +241,14 @@ class DataMatcher(object):
             elif "country" in table.columns:
                 country_attr = "country"
             else: # calculate similarity to get country
-                scores = self.similarity_batch("country", table.columns)
+                scores = self.similarity_batch("country", table.columns.to_list())
                 country_attr = table.columns[scores.argmax()]
             if "date" in table.columns:
                 date_attr = "date"
             elif "year" in table.columns:
                 date_attr = "year"
             else:
-                scores = self.batch2batch(["date", "year", "time"], table.columns)
+                scores = self.batch2batch(["date", "year", "time"], table.columns.to_list())
                 scores = scores.max(axis=0)
                 date_attr = table.columns[scores.argmax()]
         else:
