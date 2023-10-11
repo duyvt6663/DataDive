@@ -396,13 +396,45 @@ data provided does not include the necessary information """
             if write:
                 with open("./fresh files/Merged.json", 'w') as f:
                     json.dump(mf, f, indent=4)
+    
+    async def statistics(self):
+        import sqlite3
+        conn = sqlite3.connect('database/sql_app.db')
+        cursor = conn.cursor()
+        table_name = "logs"
+        cursor.execute("SELECT * FROM {}".format(table_name))
+        rows = cursor.fetchall()
+        
+        event_column = [row[1] for row in rows]  # assuming 'event' is the column name
+        unique_events = set(event_column)
+        print(f"Unique events: {unique_events}")
+        
+        # Count occurrences of each event
+        event_counts = {event: event_column.count(event) for event in unique_events}
+        print(f"Event counts: {event_counts}")
+
+        async def plot_event_counts(event_counts):
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, _plot_event_counts, event_counts)
+
+        def _plot_event_counts(event_counts):
+            plt.barh(list(event_counts.keys()), list(event_counts.values()))
+            plt.tick_params(axis='y', labelsize=5)  # Adjust the size of the y-axis labels
+            plt.xlabel('Event')
+            plt.ylabel('Count')
+            plt.title('Event counts')
+            plt.show()
+       
+        plot_task = asyncio.create_task(plot_event_counts(event_counts))
+        await plot_task
 
 async def main():
     tester = Tester(datasrc="../Datasets")
-    rset = [57, 14, 72]
-    # await tester.test_recommend(rset=rset, n=2)
-    # await tester.test_potential_datapoints(rset=rset, n=2)
-    await tester.add_index(write=True)
+    # rset = [57, 14, 72]
+    # # await tester.test_recommend(rset=rset, n=2)
+    # # await tester.test_potential_datapoints(rset=rset, n=2)
+    # await tester.add_index(write=True)
+    await tester.statistics()
 
 if __name__ == "__main__":
     asyncio.run(main())
