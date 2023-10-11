@@ -1,4 +1,4 @@
-# ClaimVis
+# DataDive
 Aiding online discussion users in verifying claims and exploring info on data-rich threads.
 The current pipeline: 
 <p align="center">
