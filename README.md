@@ -1,7 +1,7 @@
 # DataDive
-Aiding online discussion users in verifying claims and exploring info on data-rich threads.
-The current pipeline: 
+Aiding online discussion users in verifying claims and exploring info on data-rich threads. **IUI 2024**.
+
 <p align="center">
- <img src="https://github.com/kixlab/ClaimVis/assets/93929554/13d1ecbc-08d9-43a2-ae6e-1870bb7a5279" width="700">  
+ <img src="https://github.com/duyvt6663/DataDive/assets/93929554/9fac912e-4d2c-4ea6-a94f-325439b659cc" width="700">  
 <p>  
 
